@@ -32,7 +32,7 @@ public class ServerPingerExpansion extends PlaceholderExpansion {
 
     @Override
     public String onPlaceholderRequest(Player player, String params) {
-        if (params.isEmpty()) {
+        if (params == null || params.isEmpty()) {
             return "No server specified";
         }
 
