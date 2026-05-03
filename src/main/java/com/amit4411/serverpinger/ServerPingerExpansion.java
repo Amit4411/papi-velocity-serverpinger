@@ -1,10 +1,12 @@
 package com.amit4411.serverpinger;
 
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 public class ServerPingerExpansion extends PlaceholderExpansion {
     private final Map<String, CachedServerInfo> cache = new HashMap<>();
@@ -66,12 +68,12 @@ public class ServerPingerExpansion extends PlaceholderExpansion {
                     return "Unknown type: " + type;
             }
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            return "Error";
         }
     }
 
     private ServerInfo getServerInfo(String address) {
-        // Check cache
+        // Check cache first
         if (cache.containsKey(address)) {
             CachedServerInfo cached = cache.get(address);
             if (System.currentTimeMillis() - cached.timestamp < CACHE_TIME) {
@@ -79,13 +81,23 @@ public class ServerPingerExpansion extends PlaceholderExpansion {
             }
         }
 
-        try {
-            ServerInfo info = ServerPinger.ping(address);
-            cache.put(address, new CachedServerInfo(info, System.currentTimeMillis()));
-            return info;
-        } catch (Exception e) {
-            return null;
+        // Return cached or default if not in cache (will be updated async)
+        CachedServerInfo cached = cache.get(address);
+        if (cached != null) {
+            return cached.info;
         }
+
+        // Start async ping in background
+        CompletableFuture.runAsync(() -> {
+            try {
+                ServerInfo info = ServerPinger.ping(address);
+                cache.put(address, new CachedServerInfo(info, System.currentTimeMillis()));
+            } catch (Exception e) {
+                cache.put(address, new CachedServerInfo(null, System.currentTimeMillis()));
+            }
+        });
+
+        return null; // Return null on first request
     }
 
     private static class CachedServerInfo {
